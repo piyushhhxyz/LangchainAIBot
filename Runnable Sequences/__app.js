@@ -3,10 +3,10 @@
 require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
 const { ChatOpenAI } = require("langchain/chat_models/openai");
-const { RunnableSequence } = require("langchain/schema/runnable");
 const { OpenAIEmbeddings } = require("langchain/embeddings/openai");
 const { PromptTemplate } = require("langchain/prompts");
 const { StringOutputParser } = require("langchain/schema/output_parser");
+const { RunnableSequence, RunnablePassthrough } = require("langchain/schema/runnable");
 
 
 const url = process.env.SUPABASE_URL_AGI_CHATBOT;
@@ -27,25 +27,34 @@ const punctuationTemplate = `Given a sentence, add punctuation where needed.
 const grammarTemplate = `Given a sentence correct the grammar.
                 sentence: {punctuated_sentence}
                 sentence with correct grammar:`; //3rd
-const translationTemplate = "translate the following to japanese:{sentence}"; //4th
+const translationTemplate = `Given a sentence, translate that sentence into {language}
+                sentence: {grammatically_correct_sentence}
+                translated sentence:` //4th
 
 const punctutationPrompt = PromptTemplate.fromTemplate(punctuationTemplate);
 const grammarPrompt = PromptTemplate.fromTemplate(grammarTemplate);
 const translatePrompt = PromptTemplate.fromTemplate(translationTemplate);
 
+
+const punctutationChain = RunnableSequence.from([punctutationPrompt, llm, new StringOutputParser()]);
+const grammarChain = RunnableSequence.from([grammarPrompt, llm, new StringOutputParser()]);
+const translationChain = RunnableSequence.from([translatePrompt, llm, new StringOutputParser()]);
+
 const chain = RunnableSequence.from([
-    punctutationPrompt,
-    llm,
-    new StringOutputParser(),
-    // prev => console.log("punctuated_sentence: "+prev),
-    { punctuated_sentence: prev => prev },
-    grammarPrompt,
-    llm,
-    new StringOutputParser(),
+    { 
+        punctuated_sentence: punctutationChain,
+        original_input: new RunnablePassthrough(),
+    },
+    { 
+        grammatically_correct_sentence:grammarChain,
+        language:({ original_input }) => original_input.language
+    },
+    translationChain,
+
 ])
 
 async function main(){
-    const response = await chain.invoke({ input });
-    console.log(response);
+    const response = await chain.invoke({ input, language:"Hindi" });
+    console.log("Final: "+response);
 }
 main();
