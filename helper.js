@@ -3,7 +3,7 @@ const { ChatOpenAI } = require("langchain/chat_models/openai");
 
 const { PromptTemplate } = require("langchain/prompts");
 const { StringOutputParser } = require('langchain/schema/output_parser');
-const retriever = require("./retriever");
+const retriever = require("./utils/retriever");
 const { combineDocuments } = require("./utils/combineDocs");
 
 
